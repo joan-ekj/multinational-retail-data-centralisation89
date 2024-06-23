@@ -3,7 +3,6 @@ import pandas as pd
 import tabula
 import requests
 import boto3
-from sqlalchemy import inspect
 from database_utils import DatabaseConnector
 
 connector = DatabaseConnector() # removed from constructor 
@@ -11,50 +10,92 @@ connector = DatabaseConnector() # removed from constructor
 class DataExtractor:
     def __init__(self):
           pass
-       
-
-    def list_db_tables(self): #here or in databaseconnector?
-       engine = connector.engine
-       inspector = inspect(engine)
-       tables = inspector.get_table_names()
-       print(tables)
-       return tables
     
-    def read_rds_table(self, table_name):
-       engine = connector.engine
-       user_data = pd.read_sql_query('''SELECT * FROM "{table_name}"''', engine)
+    def read_rds_table(self, engine, table_name): #legacy_users
+       '''
+       This method extracts the database table to a pandas DataFrame.
+       
+       Args:
+        engine: The SQLAlchemy engine from DatabaseConnector class
+        table_name: Name of the table to read from the database 
+
+       Returns: 
+         A pandas DataFrame containing the table data
+
+       '''
+       # engine = connector.engine
+       query = f'SELECT * FROM "{table_name}"'
+       user_data = pd.read_sql_query(query, engine)
        print(user_data)
        return user_data
-       
 
-       #table_name = input('enter table name')
        #It will take in an instance of your DatabaseConnector class and the table name as an argument and return a pandas DataFrame.
        #Use your list_db_tables method to get the name of the table containing user data.
        #Use the read_rds_table method to extract the table containing user data and return a pandas DataFrame.
 
     def retrieve_pdf_data(self, pdf_path):
+       '''
+       This method extracts all the pages of a pdf document to a pandas DataFrame.
+
+       Args:
+        pdf_path (str): file path to the pdf 
+
+        Returns:
+         A pandas DataFrame containing the card details data
+
+       '''
        #pdf_path = r'C:\Users\ejoan\AiCore_Learning\mrdc\card_details.pdf' - avoid hard coding 
        card_details = tabula.read_pdf(pdf_path, stream=True)
        return card_details 
     
-    def list_number_of_stores(self): # It should take in the number of stores endpoint and header dictionary as an argument
+    def list_number_of_stores(self, url, headers): # It should take in the number of stores endpoint and header dictionary as an argument
+        '''
+        This method returns the number of stores in the business.
+
+        Args: 
+         url: 
+         headers: 
+
+        Returns: 
+         the number of stores.
+
+        '''
         url = r'https://aqj7u5id95.execute-api.eu-west-1.amazonaws.com/prod/number_stores'
-        headers = {'x-api-key': 'yFBQbwXe9J3sd6zWVAMrK6lcxxr0q1lr2PT6DDM'}
+        headers = {'x-api-key': 'yFBQbwXe9J3sd6zWVAMrK6lcxxr0q1lr2PT6DDMX'}
       
         response = requests.get(url, headers=headers)
         data = response.json()
         number_stores = data['number_stores']
+        print(number_stores)
         return number_stores
    
 
     def retrieve_stores_data(self, number_stores): # will take the retrieve a store endpoint as an argument and extracts all the stores from the API saving them in a pandas DataFrame
-        url = f'https://aqj7u5id95.execute-api.eu-west-1.amazonaws.com/prod/store_details/{number_stores}'
-        headers = {'x-api-key': 'yFBQbwXe9J3sd6zWVAMrK6lcxxr0q1lr2PT6DDM'}
-      
-        response = requests.get(url, headers=headers)
-        data = response.json()
-        store_data =  pd.read_json(data)
+        '''
+        This method extracts all the stores data from the API and saves them in a pandas DataFrame
+
+        Args: 
+         number_stores(int): number of stores retrieved in list_number_of_stores
+
+        Returns: 
+         the store data in a pandas DataFrame.
+
+        '''
+        headers = {'x-api-key': 'yFBQbwXe9J3sd6zWVAMrK6lcxxr0q1lr2PT6DDMX'} # hide?
+        result = []
+    
+        for store_number in range(number_stores):
+            url = f'https://aqj7u5id95.execute-api.eu-west-1.amazonaws.com/prod/store_details/{store_number}'
+            try:
+                response = requests.get(url, headers=headers)
+                response.raise_for_status() # checks if request was successful
+                result.append(pd.json_normalize(response.json()))
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching store {store_number}: {e}")
+    
+        store_data = pd.concat(result, ignore_index=True)
         return store_data
+
     
     def extract_from_s3(self, s3_url):
         #r's3://data-handling-public/products.csv'
