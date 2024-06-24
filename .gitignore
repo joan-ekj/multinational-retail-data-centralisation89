@@ -1,4 +1,5 @@
 *.yaml
+*.yml
 card_details.pdf
 working.ipynb
 Untitled-5.ipynb
@@ -6,5 +7,6 @@ products.csv
 *.ipynb
 *.json
 *.csv
-.gitignore
 object_key
+cloud_creds.yaml
+local_creds.yaml
