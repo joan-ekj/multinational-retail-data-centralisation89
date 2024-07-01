@@ -2,19 +2,26 @@ import yaml
 from sqlalchemy import create_engine, inspect
 
 class DatabaseConnector: 
-     def __init__(self): #=r'C:\Users\ejoan\AiCore_Learning\mrdc\db_creds.yaml'
+     def __init__(self, creds):
+      '''
+      This initialises the DatabaseConnector. 
+
+      Args:
+        creds (str): File path containing the database credtentials.
+
+      '''
       self.creds = self.read_db_creds(creds)
       self.engine = self.init_db_engine()
 
      def read_db_creds(self, creds):
       '''
-      This method reads the database credentials from a file and returns a dictionary of the credentials.
+      This method reads the database credentials from a YAML file.
       
       Args:
-        creds: File path containing the database credtentials 
+        creds(str): File path containing the database credtentials.
 
       Returns: 
-        database credentials in a dictionary
+        dict: Database credentials.
 
       '''
       with open(creds, 'r') as db_cred:
@@ -23,13 +30,13 @@ class DatabaseConnector:
      
      def init_db_engine(self):
        '''
-       This method reads the credentials from the return of read_db_creds, initialises and returns a sqlalchemy database engine.
+       This method initialises the SQLAlchemy database engine using the credentials.
 
        Args:
         None
 
        Returns:
-        a sqlalchemy engine 
+        engine: SQLAlchemy engine.
 
        '''
        cred = self.creds
@@ -39,13 +46,13 @@ class DatabaseConnector:
      
      def list_db_tables(self): #here or in databasextractions?
        '''
-       This method uses the engine and lists all the tables in the database.
+       This method lists all the tables in the database.
 
        Args: 
         None
 
        Returns:
-        a list of all the tables in the database
+        list: List of all the tables in the database
 
        '''
        inspector = inspect(self.engine)
@@ -53,13 +60,12 @@ class DatabaseConnector:
        print(tables)
        return tables
      
-     def upload_to_db(self, df, table_name): # needs to upload to local db instead 
-       #extracted and cleaned use the upload_to_db method to store the data in your sales_data database in a table named dim_users.
+     def upload_to_db(self, df, table_name): 
        '''
-       This function uploads a dataframe to a specified table in the database.
+       This method uploads a DataFrame to a specified table in the database.
 
        Args:
-        df (pd.DataFrame): pandas DataFrame to be uploaded.
+        df (pd.DataFrame): DataFrame to be uploaded.
         table_name (str): name of the table in the database.
 
        Returns:

@@ -1,28 +1,21 @@
-import pandas as pd, numpy as np, re, phonenumbers
+import pandas as pd
+import numpy as np
+import re
+import phonenumbers
 from phonenumbers import NumberParseException
 from dateutil.parser import parse
-from data_extraction import DataExtractor
-from database_utils import DatabaseConnector
-from pandas.api.types import is_datetime64_dtype
-
-extractor = DataExtractor() # do I need to create an instance of this here?
-connector = DatabaseConnector()
+# from pandas.api.types import is_datetime64_dtype
 
 class DataCleaning: 
-    def __init__(self):
-        # self.extractor = DataExtractor() # do I need to create an instance of this here?
-        # self.connector = DatabaseConnector()
-        pass
-
-    def clean_null_and_empty(self, df: pd.DataFrame):
+    def clean_null_and_empty(self, df):
         '''
-        This method takes a DataFrame, replaces null values and empty strings with np.nan, and resets the index.
+        This method cleans nulls in a DataFrame.
 
         Args:
-         df (pd.DataFrame): a pandas DataFrame containing the column to clean.
+         df (pd.DataFrame): a pandas DataFrame containing columns to clean.
 
         Returns:
-         pd.DataFrame: a cleaned dataframe with - do I need to return?
+         pd.DataFrame: a cleaned DataFrame with nulls and empty strings handled. 
 
         '''
         df = df.fillna(np.nan)  # Replace null values with np.nan
@@ -44,13 +37,39 @@ class DataCleaning:
          pd.DataFrame: the DataFrame with the specified column parsed as dates.
 
         '''
-        df[column_name] = df[column_name].apply(lambda x: parse(x, fuzzy=True) if pd.notnull(x) else pd.NaT) #fuzzy=True allows non-date characters to be parsed
-        df[column_name] = pd.to_datetime(df[column_name], errors='coerce') # errors=coerce ensures unparseable dates are converted to 'NaT'
+        def try_parse_date(x):
+            try:
+                return parse(x, fuzzy=True) #fuzzy=True allows non-date characters to be parsed
+            except (ValueError, TypeError):
+                return pd.NaT
+
+        #apply try_parse_date, if not null return date else NaT  
+        df[column_name] = df[column_name].apply(lambda x: try_parse_date(x) if pd.notnull(x) else pd.NaT) 
+        # errors=coerce ensures unparseable dates are converted to 'NaT'
+        df[column_name] = pd.to_datetime(df[column_name], errors='coerce')
         return df
+    
+    def clean_expiry_date(self, df, column_name):
+        '''
+        This method cleans the expiry date column in specified DataFrame.
+
+        Args:
+         df (pd.DataFrame): a pandas DataFrame
+         column_name (str): The name of the column with dates.
+ 
+
+        Returns:
+         pd.DataFrame: the DataFrame with cleaned expiry date column.
+
+        ''' 
+        df[column_name] = df[column_name].astype(str)
+        df[column_name] = df[column_name].apply(lambda x: x if len(x) <6 else np.nan)
+        return df
+
     
     def clean_phone_numbers(self, df, column_name):
         '''
-        Cleans and formats phone numbers in a DataFrame column, returning a new DataFrame.
+        This method cleans and formats phone numbers in a DataFrame column.
 
         Args:
          df (pd.DataFrame): The DataFrame containing the phone numbers.
@@ -85,8 +104,8 @@ class DataCleaning:
          pd.DataFrame: DataFrame with cleaned user names.
 
         '''
-        df[column_name] = df[column_name].apply(lambda text: re.sub(r'\d', '', text))
-
+        df[column_name] = df[column_name].astype(str).fillna('')
+        df[column_name] = df[column_name].apply(lambda x: re.sub(r'\d', '', x))
         return df
     
     def clean_staff_num(self, df, column_name):
@@ -101,83 +120,86 @@ class DataCleaning:
          pd.DataFrame: DataFrame with cleaned staff number.
 
         '''
-        if len(column_name) > 3:
-            return ''
-        
-        df[column_name] = df[column_name].apply(lambda x: re.sub(r'\D', '')) #replace non-digits with ''
-        return df
+        df[column_name] = df[column_name].astype(str)
+        df[column_name] = df[column_name].apply(lambda x: re.sub(r'\D', '', x))
+        df[column_name] = df[column_name].apply(lambda x: x if len(x) <= 3 else np.nan)
+        return df 
 
         
-    def clean_user_data(self):
+    def clean_user_data(self, user_data):
         '''
         This method cleans the user data.
 
         Args: 
-         none
+         user_data (pd.DataFrame): DataFrame containing user data.
 
         Returns: 
          pd.DataFrame: DataFrame with cleaned user data.
 
         '''
-        user_data = extractor.read_rds_table('legacy_user') # check if required, maybe add the dataframe as an argument?
-        cleaned_user_data = self.parse_dates(cleaned_user_data, 'date_of_birth')
-        cleaned_user_data = self.parse_dates(cleaned_user_data, 'join_date')
-        cleaned_user_data = self.clean_phone_numbers(cleaned_user_data, 'phone')
-        cleaned_user_data = self.replace_if_contains_digits(cleaned_user_data, 'first_name')
-        cleaned_user_data = self.replace_if_contains_digits(cleaned_user_data, 'last_name')
-        cleaned_user_data = cleaned_user_data['country_code'].str.replace({'GGB': 'GB'})
-        cleaned_user_data = cleaned_user_data['country'].apply(lambda x: '' if x not in ['Germany', 'United Kingdom', 'United States'] else x)
-        cleaned_user_data = self.clean_null_and_empty(user_data)
+        user_data = self.parse_dates(user_data, 'date_of_birth')
+        user_data = self.parse_dates(user_data, 'join_date')
+        user_data = self.clean_phone_numbers(user_data, 'phone_numbers')
+        user_data = self.replace_if_contains_digits(user_data, 'first_name')
+        user_data = self.replace_if_contains_digits(user_data, 'last_name')
+        user_data['country_code'] = user_data['country_code'].replace('GGB', 'GB')
+        user_data = user_data['country'].apply(lambda x: '' if x not in ['Germany', 'United Kingdom', 'United States'] else x)
+        user_data = self.clean_null_and_empty(user_data)
 
-        return cleaned_user_data
-    
-    connector.upload_to_db(cleaned_user_data, dim_users) # do I need this here?
+        return user_data
 
-    def clean_card_data(self):
+    def clean_card_data(self, card_details):
         '''
         This method cleans the card details.
 
         Args: 
-         none
+         card_details (pd.DataFrame): DataFrame containing card details.
 
         Returns: 
          pd.DataFrame: DataFrame with cleaned card details. 
 
         '''
-        clean_card_dets = card_details['card_number'].str.replace(r'[^\d]', '', regex=True) #do I need to load card details data here like user data?
-        clean_card_dets = self.clean_null_and_empty(clean_card_dets)
+        card_details = card_details['card_number'].replace(r'[^\d]', '', regex=True)
+        card_details = self.clean_expiry_date(card_details, 'expiry_date') 
+        card_details = self.parse_dates(card_details, 'date_payment_confirmed')
+        # card_details = self.clean_null_and_empty(card_details)
        
-        return clean_card_dets  
-
-    connector.upload_to_db(clean_card_dets, dim_card_details) # does this need to be inside clean_card_data method?
-    
-    def clean_store_data(self):
+        return card_details 
+ 
+    def clean_store_data(self, store_data):
         '''
         This method cleans the store data.
 
         Args: 
-         None 
+         store_data (pd.DataFrame): DataFrame containing store data.
 
         Returns: 
          pd.DataFrame: DataFrame with cleaned store data.
 
         '''
-        store_data = self.retrieve_stores_data() #required?
-        clean_store_data['continent'] = store_data['continent'].str.replace({'eeEurope': 'Europe', 'eeAmerica': 'America'})
-        clean_store_data['continent'] = clean_store_data['continent'].apply(lambda x: '' if x not in ['America', 'Europe'] else x)
-        # clean_store_data = clean_store_data.drop(columns=['lat']) 
-        clean_store_data = self.parse_dates(clean_store_data, 'opening_date')
-        clean_store_data['longitude'] = pd.to_numeric(clean_store_data['longitude'], errors='coerce')
-        clean_store_data['latitude'] = pd.to_numeric(clean_store_data['latitude'], errors='coerce')
-        clean_store_data =  self.clean_staff_num(clean_store_data, 'staff_numbers')
+        store_data['continent'] = store_data['continent'].replace({'eeEurope': 'Europe', 'eeAmerica': 'America'})
+        store_data['continent'] = store_data['continent'].apply(lambda x: '' if x not in ['America', 'Europe'] else x)
+        store_data['country_code'] = store_data['country_code'].apply(lambda x: '' if x not in ['GB', 'US', 'DE'] else x)
+        store_data = self.parse_dates(store_data, 'opening_date')
+        store_data =  self.clean_staff_num(store_data, 'staff_numbers')
+        store_data['longitude'] = pd.to_numeric(store_data['longitude'], errors='coerce')
+        store_data['latitude'] = pd.to_numeric(store_data['latitude'], errors='coerce')
         clean_store_data = self.clean_null_and_empty(clean_store_data)
         
-        return clean_store_data
-
-    connector.upload_to_db(clean_store_data, dim_store_details)
+        return store_data
 
     @staticmethod
     def clean_weight(weight): 
+        '''
+        This method validates the weight format in the product data.
+
+        Args:
+         weight (str): A string representing the weight.
+
+        Returns:
+         str or NaN: The original weight string if valid, else NaN.
+
+        '''
         pattern1 = r'(\d+)\s*x\s*(\d+\.?\d*)\s*(kg|g|mg|lb|oz|ml|l)'  # Pattern 1: eg. 2 x 50 - need to define function to address this as currently ignored 
         pattern2 = r'(\d+\.?\d*)\s*(kg|g|mg|lb|oz|ml|l)'  # Pattern 2: 5g, 20g etc 
         if re.match(pattern1, str(weight)) or re.match(pattern2, str(weight)):
@@ -187,6 +209,17 @@ class DataCleaning:
     
     @staticmethod
     def convert_to_kg(weight):
+        '''
+        This method converts different weight units to kilograms.
+
+        Args:
+         weight (str): A string representing the weight.
+
+        Returns:
+         float or NaN: The weight in kilograms or NaN if invalid.
+         
+        '''
+        weight = str(weight)
         conversion_factors = {
             'kg': 1,
             'g': 0.001,
@@ -201,7 +234,7 @@ class DataCleaning:
              try:
                 if 'x' in weight:
                     quantity, value = weight.split('x')
-                    quantity = float(quantity)
+                    quantity = float(quantity.strip())
                     value = float(value.replace(unit, '').strip()) #strip handles spaces
                     return quantity * value * conversion_factors[unit]
                 else:
@@ -210,76 +243,74 @@ class DataCleaning:
              except ValueError:
                 return np.nan
 
-
-    def convert_product_weights(self, products_data: pd.DataFrame):
+    def convert_product_weights(self, df, column_name):
         '''
         This method cleans and converts the weight column to float in kg.
 
         Args: 
-         df: products data DataFrame
+         df (DataFrame): DataFrame containing products data
 
         Returns: 
-         pd.DataFrame: pandas DataFrame with cleaned weight column.
+         pd.DataFrame: DataFrame with cleaned weight column.
 
         '''
-        products_data['weight'] = products_data['weight'].apply(DataCleaning.clean_weight) #is this appropriate? or self.clean_weight
-        products_data['weight_kg'] = products_data['weight'].apply(DataCleaning.convert_to_kg)
+       
+        df[column_name] = df['weight'].apply(DataCleaning.clean_weight) #is this appropriate? or self.clean_weight
+        df[column_name] = df['weight'].apply(DataCleaning.convert_to_kg)
 
-        return products_data
+        return df
         
-    def clean_products_data(self, products_data: pd.DataFrame):
+    def clean_products_data(self, products_data): 
         '''
         This method cleans the products data.
 
         Args: 
-         products_data: pd.DataFrame containing products data.
-
+         products_data (pd.DataFrame): DataFrame containing products data. 
         Returns: 
-         pd.DataFrame: cleaned products data in pandas DataFrame.
+         pd.DataFrame: DatFrame with cleaned products data.
 
         '''
-        clean_products_data['product_price'] = products_data['product_price'].str.replace(r'^(?!£).*$', '', regex=True) #if there's no £ in the string, replace with ''
-        clean_products_data['EAN'] = clean_products_data['EAN'].str.replace(r'^(?!\d{13}$).*', '', regex=True) # if not 13 digits, replace with ''
-        #clean_products_data = self.parse_dates(clean_products_data['date_added'], errors ='coerce')
+        # products_data = pd.read_csv('products.csv') - redundant if already an argument 
+        products_data['product_price'] = products_data['product_price'].str.replace(r'^(?!£).*$', '', regex=True) 
+        products_data = self.covert_product_weights(products_data, 'weight')
+        products_data = self.clean_null_and_empty(products_data)
+        products_data = self.parse_dates(products_data, 'date_added')
 
-        clean_products_data = self.clean_null_and_empty(clean_products_data)
-        clean_products_data = self.parse_dates(clean_products_data, 'date_added')
+        return products_data
 
-        return clean_products_data
-
-    connector.upload_to_db(clean_products_data, dim_products)
-
-    def clean_orders_data(self):
+    def clean_orders_data(self, orders_data):
         '''
         This method cleans the orders table data.
 
         Args: 
-         products_data: pd.DataFrame containing products data # orders_data as an argument
+         orders_data (pd.DataFrame): DataFrame with the orders data. 
 
         Returns: 
-         cleaned orders data in pandas DataFrame.
+         pd.DataFrame: DataFrame with cleaned orders data.
 
         '''
-        orders_data = extractor.read_rds_table('orders_table') # read or take in as an argument
-        cleaned_orders_data = cleaned_orders_data.drop(columns=['first_name', 'last_name', '1']) #drop these columns
-        cleaned_orders_data= self.clean_null_and_empty(cleaned_orders_data)
+        orders_data = orders_data.drop(columns=['first_name', 'last_name', '1']) #drop these columns
+        orders_data= self.clean_null_and_empty(orders_data)
     
-        return cleaned_orders_data      
+        return orders_data      
     
-    connector.upload_to_db(clean_orders_data, orders_table)
+    def clean_date_data(self, date_data):
+        '''
+        This method cleans the date_times table.
 
-    def clean_date_data(self):
-       #this required - consider dropping rows with invalid date data, drop if year has digits 
-       clean_date_data = self.clean_null_and_empty(date_data)
+        Args: 
+         date_data (pd.DataFrame): DataFrame with date times data.
 
-       #clean_date_data = date_data.fillna(np.nan) 
-       #clean_date_data = clean_date_data.replace('', np.nan)
-       #clean_date_data = clean_date_data.dropna()
-       #clean_date_data = clean_date_data.reset_index(drop=True)
+        Returns: 
+         pd.DataFrame: DataFrame with cleaned date data.
 
-       return clean_date_data
+        '''
+        date_data['year'] = date_data['year'].apply(lambda year: re.sub(r'^(?!\d{4}$).*', '', year))
+        date_data = self.clean_null_and_empty(date_data)
+
+        return date_data
     
-    connector.upload_to_db(clean_date_data, dim_date_times)
+
     
 
        

@@ -1,12 +1,11 @@
 *.yaml
 *.yml
-card_details.pdf
-working.ipynb
-Untitled-5.ipynb
-products.csv
+*.pdf
 *.ipynb
 *.json
 *.csv
 object_key
 cloud_creds.yaml
 local_creds.yaml
+__pycache__
+.vscode 

@@ -13,6 +13,13 @@ Using SQL, update the respective columns as primary key columns.
 
 -- Dim-Users 
 -- make user_uuid PK 
+
+/*
+DELETE FROM dim_store_details
+WHERE store_code IS NULL;
+
+*/
+
 ALTER TABLE dim_users
 ADD PRIMARY KEY (user_uuid);
 
@@ -24,8 +31,7 @@ ADD PRIMARY KEY (store_code);
 -- Dim-Products
 -- products_code PK 
 ALTER TABLE dim_products
-ADD PRIMARY KEY (products_code); -- need to update product code in orders to all caps 
-
+ADD PRIMARY KEY (product_code); 
 --Dim-Date-Times
 -- date_uuid PK 
 ALTER TABLE dim_date_times
@@ -35,3 +41,4 @@ ADD PRIMARY KEY (date_uuid);
 -- card_number PK
 ALTER TABLE dim_card_details
 ADD PRIMARY KEY (card_number);
+

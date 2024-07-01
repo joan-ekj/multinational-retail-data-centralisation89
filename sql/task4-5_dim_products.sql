@@ -17,6 +17,8 @@ Add a new column weight_class which will contain human-readable values based on 
 +----------------------------+-----------------+
 
 */
+
+ 
 UPDATE dim_products 
 SET product_price = REPLACE(product_price, '£', '');
 
@@ -24,12 +26,14 @@ ALTER TABLE dim_products
 ADD COLUMN weight_class VARCHAR(20);
 
 UPDATE dim_products
-SET weight = CASE
+SET weight_class = CASE
     WHEN weight < 2 THEN 'Light'
-    WHEN weight >= 2 - < 40 THEN 'Mid_Sized'
-    WHEN weight >= 40 - < 140 THEN 'Heavy'
-    WHEN weight => 140 'Truck-Required'
-END;  
+    WHEN weight >= 2 AND weight < 40 THEN 'Mid_Sized'
+    WHEN weight >= 40 AND weight < 140 THEN 'Heavy'
+    WHEN weight >= 140 THEN 'Truck-Required'
+END;
+
+
 
 /*
 +-----------------+--------------------+--------------------+
@@ -46,15 +50,28 @@ END;
 +-----------------+--------------------+--------------------+
 */
 
+
+UPDATE dim_products
+SET removed = CASE
+    WHEN removed = 'Still_avaliable' THEN true
+    WHEN removed = 'Removed' THEN false
+END;
+
 ALTER TABLE dim_products
-    ALTER COLUMN product_price TYPE FLOAT,
+  RENAME COLUMN removed TO still_available;
+
+ALTER TABLE dim_products
+    ALTER COLUMN product_price TYPE FLOAT USING product_price::FLOAT,
     ALTER COLUMN weight TYPE FLOAT,
-    ALTER COLUMN EAN TYPE VARCHAR(16),
+    ALTER COLUMN "EAN" TYPE VARCHAR(16),
     ALTER COLUMN product_code TYPE VARCHAR(16),
     ALTER COLUMN date_added TYPE DATE,
-    ALTER COLUMN uuid TYPE UUID,
-    ALTER COLUMN still_available TYPE BOOL,
-    ALTER COLUMN weight_class TYPE VARCHAR(20); 
+    ALTER COLUMN weight_class TYPE VARCHAR(20)
+    ALTER COLUMN uuid TYPE UUID USING still_available::UUID
+    ALTER COLUMN still_available TYPE BOOL USING still_available::BOOL; 
 
+ 
+ALTER TABLE dim_products
+  RENAME COLUMN removed TO still_available;
 
 

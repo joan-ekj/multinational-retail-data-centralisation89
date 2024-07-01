@@ -12,5 +12,5 @@ Make the associated changes after finding out what the lengths of each variable 
 
 ALTER TABLE dim_card_details
     ALTER COLUMN card_number TYPE VARCHAR(20),
-    ALTER COLUMN expiry_date TYPE VARCHAR(4),
-    ALTER COLUMN date_payment_confirmed TYPE DATE;
+    ALTER COLUMN expiry_date TYPE VARCHAR(19),
+    ALTER COLUMN date_payment_confirmed TYPE DATE USING date_payment_confirmed::DATE;

@@ -22,27 +22,44 @@ There is a row that represents the business's website change the location column
 
 */
 
--- do I really need? Could just drop lat instead as lat hasn nothing important 
-
-UPDATE dim_store_details
-SET latitude = lat
-WHERE store_type = 'Web Portal';
 
 ALTER TABLE dim_store_details
 DROP COLUMN lat;
 
 
+UPDATE dim_store_details
+SET country_code = CASE 
+    WHEN country_code NOT IN ('GB', 'US', 'DE') THEN NULL
+    ELSE country_code
+END;
+
+-- should be 441 records 
+DELETE FROM dim_store_details
+WHERE (address IS NULL
+   OR longitude IS NULL
+   OR locality IS NULL
+   OR store_code IS NULL
+   OR staff_numbers IS NULL
+   OR opening_date IS NULL
+   OR store_type IS NULL
+   OR latitude IS NULL
+   OR country_code IS NULL
+   OR continent IS NULL) 
+AND store_code <> 'WEB-1388012W';
+
 ALTER TABLE dim_store_details
     ALTER COLUMN longitude TYPE FLOAT,
     ALTER COLUMN locality TYPE VARCHAR(255),
     ALTER COLUMN store_code TYPE VARCHAR(16),
-    ALTER COLUMN staff_numbers TYPE SMALLINT,
+    ALTER COLUMN staff_numbers TYPE SMALLINT USING staff_numbers::SMALLINT,
     ALTER COLUMN opening_date TYPE DATE,
-    ALTER COLUMN store_type TYPE VARCHAR(255) NULLABLE,
+    ALTER COLUMN store_type TYPE VARCHAR(255),
     ALTER COLUMN latitude TYPE FLOAT,
     ALTER COLUMN country_code TYPE VARCHAR(2),
     ALTER COLUMN continent TYPE VARCHAR(255);
 
-UPDATE store_details_table
+
+UPDATE dim_store_details
 SET locality = NULL
 WHERE store_type = 'Web Portal'; 
+
