@@ -29,7 +29,7 @@ These are the queries I ran to answer a number of business scenario questions.
 
 ## Installation
 
-This are required to succesfully run the scripts. 
+These are required to succesfully run the scripts. 
 - Python (pandas, NumPy)
 - boto3
 - tabula-py
